@@ -124,12 +124,14 @@ Token *toknize()
       continue;
     }
 
-    if (*p == '+' || *p == '-')
+    //区分記号
+    if (strchr("+-*/", *p))
     {
       cur = new_token(TK_RESERVED, cur, p++);
       continue;
     }
 
+    //整数
     if (isdigit(*p))
     {
       cur = new_token(TK_NUM, cur, *p);
@@ -150,9 +152,11 @@ Token *toknize()
 
 typedef enum
 {
-  ND_ADD, // +
-  ND_SUB, // -
-  ND_NUM, // 整数
+  ND_ADD,   // +
+  ND_SUB,   // -
+  ND_MUL,   // *
+  ND_DIV,   // /
+  ND_NUM,   // 整数
 } NodeKind;
 
 typedef struct Node Node;
@@ -182,20 +186,43 @@ Node *new_node_num(int val)
   return node;
 }
 
+Node *expr();
+Node *mul();
 
 Node *expr()
 {
-  Node *node = new_node_num(expect_number());
+  Node *node = mul();
 
   for(;;)
   {
     if (consume('+'))
     {
-      node = new_node(ND_ADD, node, new_node_num(expect_number()));
+      node = new_node(ND_ADD, node, mul());
     }
     else if(consume('-'))
     {
-      node = new_node(ND_SUB, node, new_node_num(expect_number()));
+      node = new_node(ND_SUB, node, mul());
+    }
+    else
+    {
+      return node;
+    }
+  }
+}
+
+Node *mul()
+{
+  Node *node = new_node_num(expect_number());
+
+  for(;;)
+  {
+    if (consume('*'))
+    {
+      node = new_node(ND_MUL, node, new_node_num(expect_number()));
+    }
+    else if (consume('/'))
+    {
+      node = new_node(ND_DIV, node, new_node_num(expect_number()));
     }
     else
     {
@@ -229,6 +256,13 @@ void gen(Node *node)
     break;
   case ND_SUB:
     printf("  sub rax, rdi\n");
+    break;
+  case ND_MUL:
+    printf("  imul rax, rdi\n");
+    break;
+  case ND_DIV:
+    printf("  cpo\n");
+    printf("  idiv rdi\n");
     break;
   default:
     error("コード生成に失敗しました\n");
