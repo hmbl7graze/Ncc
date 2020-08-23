@@ -125,7 +125,7 @@ Token *toknize()
     }
 
     //区分記号
-    if (strchr("+-*/", *p))
+    if (strchr("+-*/()", *p))
     {
       cur = new_token(TK_RESERVED, cur, p++);
       continue;
@@ -188,7 +188,10 @@ Node *new_node_num(int val)
 
 Node *expr();
 Node *mul();
+Node *unary();
+Node *primary();
 
+// expr = mul ("+" mul | "-" mul)*
 Node *expr()
 {
   Node *node = mul();
@@ -210,25 +213,54 @@ Node *expr()
   }
 }
 
+// mul = unary ("*" unary | "/" unary)*
 Node *mul()
 {
-  Node *node = new_node_num(expect_number());
+  Node *node = unary();
 
   for(;;)
   {
     if (consume('*'))
     {
-      node = new_node(ND_MUL, node, new_node_num(expect_number()));
+      node = new_node(ND_MUL, node, unary());
     }
     else if (consume('/'))
     {
-      node = new_node(ND_DIV, node, new_node_num(expect_number()));
+      node = new_node(ND_DIV, node, unary());
     }
     else
     {
       return node;
     }
   }
+}
+
+// unary = ("+" | "-")? unary | primary
+Node *unary()
+{
+  if (consume('+'))
+  {
+    return unary();
+  }
+  if (consume('-'))
+  {
+    return new_node(ND_SUB, new_node_num(0), unary());
+  }
+
+  return primary();
+}
+
+// primary = "(" expr ")" | num
+Node *primary()
+{
+  if (consume('('))
+  {
+    Node *node = expr();
+    expect(')');
+    return node;
+  }
+
+  return new_node_num(expect_number());
 }
 
 //
@@ -261,7 +293,7 @@ void gen(Node *node)
     printf("  imul rax, rdi\n");
     break;
   case ND_DIV:
-    printf("  cpo\n");
+    printf("  cqo\n");
     printf("  idiv rdi\n");
     break;
   default:
